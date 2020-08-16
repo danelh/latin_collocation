@@ -4,6 +4,8 @@ from cltk.corpus.readers import get_corpus_reader
 from cltk.lemmatize.latin.backoff import BackoffLatinLemmatizer
 from cltk.tokenize.line import LineTokenizer
 
+import re
+
 def _import_corpus():
     from cltk.corpus.utils.importer import CorpusImporter
     corpus_importer = CorpusImporter('latin')
@@ -46,7 +48,8 @@ class CollocationCollector():
         self.parse_lemmas_in_group(self.lemmatize_token(token))
 
     def lemmatize_token(self, token):
-        words = token.split()
+        regex = re.compile('[^a-zA-Z]')
+        words = [regex.sub('', x) for x in token.split()]
         return self.lemmatizer.lemmatize(words)
 
     def parse_lemmas_in_group(self, grp):
@@ -59,11 +62,18 @@ class CollocationCollector():
 
     def find_collocation(self):
         # total_lemmas = sum(self.lemma_counter.values())
+        tsh = 1 / 30000.0
         lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
         for l, l_group in self.g_counter.items():
+            if lemmas_freq_in_group[l] < tsh:
+                continue
             for paired_l, paried_l_count in l_group.items():
+                if lemmas_freq_in_group[paired_l] < tsh:
+                    continue
                 expected = lemmas_freq_in_group[l] * lemmas_freq_in_group[paired_l] * self.total_groups
-                if paried_l_count > 20*expected:
+                if paried_l_count > 100*expected:
+                    if l[0].isupper() or paired_l[0].isupper():
+                        continue
                     print (l, paired_l)
 
 
