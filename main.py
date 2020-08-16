@@ -1,3 +1,4 @@
+import math
 from collections import defaultdict
 
 from cltk.corpus.readers import get_corpus_reader
@@ -40,7 +41,9 @@ class CollocationCollector():
             self.parse_sentence(s)
 
     def parse_sentence(self, sen):
-        tokens = self.tokenizer.tokenize(sen)
+        # tokens = self.tokenizer.tokenize(sen)
+        # we don't need tokenizer at all (for poetry):
+        tokens = [sen]
         for t in tokens:
             self.parse_token(t)
 
@@ -64,17 +67,33 @@ class CollocationCollector():
         # total_lemmas = sum(self.lemma_counter.values())
         tsh = 1 / 30000.0
         lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
+        # for l, l_group in self.g_counter.items():
+        #     if lemmas_freq_in_group[l] < tsh:
+        #         continue
+        #     for paired_l, paried_l_count in l_group.items():
+        #         if lemmas_freq_in_group[paired_l] < tsh:
+        #             continue
+        #         expected = lemmas_freq_in_group[l] * lemmas_freq_in_group[paired_l] * self.total_groups
+        #         if paried_l_count > 100*expected:
+        #             if l[0].isupper() or paired_l[0].isupper():
+        #                 continue
+        #             print (l, paired_l)
         for l, l_group in self.g_counter.items():
-            if lemmas_freq_in_group[l] < tsh:
-                continue
             for paired_l, paried_l_count in l_group.items():
-                if lemmas_freq_in_group[paired_l] < tsh:
-                    continue
-                expected = lemmas_freq_in_group[l] * lemmas_freq_in_group[paired_l] * self.total_groups
-                if paried_l_count > 100*expected:
-                    if l[0].isupper() or paired_l[0].isupper():
-                        continue
-                    print (l, paired_l)
+                if lemmas_freq_in_group[l] < 0.05 and lemmas_freq_in_group[paired_l] < 0.05:
+                    t= self.analyze_pair(l, paired_l, lemmas_freq_in_group)
+                    if t > 4:
+                        print(l, paired_l, t)
+
+    def analyze_pair(self, l1, l2, lemmas_freq_in_group):
+        p1 = lemmas_freq_in_group[l1]
+        p2 = lemmas_freq_in_group[l2]
+        m = p1*p2
+        x = float(self.g_counter[l1][l2]) / self.total_groups
+        s2 = x * (1-x)
+        t = (x - m) / math.sqrt(s2/self.total_groups)
+        return t
+
 
 
 tokenizer = LineTokenizer('latin')
@@ -92,3 +111,4 @@ cc.find_collocation()
 print ("test")
 
 
+# very good examples in "stringo" "lacus" "iaceo corpus"
