@@ -29,7 +29,9 @@ class CollocationCollector():
     def __init__(self, lemmatizer, tokenizer):
         self.lemmatizer = lemmatizer
         self.tokenizer = tokenizer
-        self.counter = defaultdict(lambda: defaultdict(int))
+        self.g_counter = defaultdict(lambda: defaultdict(int))
+        self.lemma_counter = defaultdict(int)
+        self.total_groups = 0
 
     def parse(self, sentences):
         for s in sentences:
@@ -50,8 +52,19 @@ class CollocationCollector():
     def parse_lemmas_in_group(self, grp):
         lemmas = {x[1] for x in grp}
         for l in lemmas:
+            self.lemma_counter[l] += 1
             for l2 in lemmas-{l}:
-                self.counter[l][l2] += 1
+                self.g_counter[l][l2] += 1
+        self.total_groups += 1
+
+    def find_collocation(self):
+        # total_lemmas = sum(self.lemma_counter.values())
+        lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
+        for l, l_group in self.g_counter.items():
+            for paired_l, paried_l_count in l_group.items():
+                expected = lemmas_freq_in_group[l] * lemmas_freq_in_group[paired_l] * self.total_groups
+                if paried_l_count > 20*expected:
+                    print (l, paired_l)
 
 
 tokenizer = LineTokenizer('latin')
@@ -64,7 +77,8 @@ sentences = list(reader.sents())
 print (len(sentences))
 cc = CollocationCollector(lemmatizer, tokenizer)
 cc.parse(sentences)
-print (cc.counter["capio"])
+cc.find_collocation()
+# print (cc.g_counter["capio"])
 print ("test")
 
 
