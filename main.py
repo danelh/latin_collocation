@@ -13,7 +13,9 @@ def _import_corpus():
     for x in corpus_importer.list_corpora:
         print (x)
         try:
-            corpus_importer.import_corpus(x)
+            pass
+            # if x == "phi5":
+            #     corpus_importer.import_corpus(x)
         except Exception as e:
             # probably because expecting local
             print (e)
@@ -147,6 +149,7 @@ class CollocationCollector():
     #     return t
 
 
+# _import_corpus()
 
 tokenizer = LineTokenizer('latin')
 lemmatizer = BackoffLatinLemmatizer()
@@ -157,7 +160,7 @@ docs = list(reader.docs())
 sentences = list(reader.sents())
 
 # to speedup
-sentences = sentences[::2]
+sentences = sentences[::1]
 
 print (len(sentences))
 # collection_method = DefaultCollectionMethod()
