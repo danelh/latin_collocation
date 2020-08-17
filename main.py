@@ -27,14 +27,50 @@ def parse_sentence(sen, lemmatizer, tokenizer):
         res = lemmatizer.lemmatize(tokens)
         print(res)
 
-
-class CollocationCollector():
-    def __init__(self, lemmatizer, tokenizer):
-        self.lemmatizer = lemmatizer
-        self.tokenizer = tokenizer
+class DefaultCollectionMethod():
+    def __init__(self):
         self.g_counter = defaultdict(lambda: defaultdict(int))
         self.lemma_counter = defaultdict(int)
         self.total_groups = 0
+        self.r_tsh = 4.0
+        self.freq_tsh = 0.1
+
+    def parse_lemmas_in_group(self, grp):
+        lemmas = {x[1] for x in grp}
+        for l in lemmas:
+            self.lemma_counter[l] += 1
+            for l2 in lemmas-{l}:
+                self.g_counter[l][l2] += 1
+        self.total_groups += 1
+
+    def find(self):
+
+        lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
+        for l, l_group in self.g_counter.items():
+            for paired_l, paried_l_count in l_group.items():
+                if lemmas_freq_in_group[l] < self.freq_tsh and lemmas_freq_in_group[paired_l] < self.freq_tsh:
+                    t = self.analyze_pair(l, paired_l, lemmas_freq_in_group)
+                    if t > self.r_tsh:
+                        print(l, paired_l, t)
+
+    def analyze_pair(self, l1, l2, lemmas_freq_in_group):
+        p1 = lemmas_freq_in_group[l1]
+        p2 = lemmas_freq_in_group[l2]
+        m = p1 * p2
+        x = float(self.g_counter[l1][l2]) / self.total_groups
+        s2 = x * (1 - x)
+        t = (x - m) / math.sqrt(s2 / self.total_groups)
+        return t
+
+
+class CollocationCollector():
+    def __init__(self, lemmatizer, tokenizer, collection_method):
+        self.lemmatizer = lemmatizer
+        self.tokenizer = tokenizer
+        self.collection_method = collection_method
+        # self.g_counter = defaultdict(lambda: defaultdict(int))
+        # self.lemma_counter = defaultdict(int)
+        # self.total_groups = 0
 
     def parse(self, sentences):
         for s in sentences:
@@ -48,51 +84,44 @@ class CollocationCollector():
             self.parse_token(t)
 
     def parse_token(self, token):
-        self.parse_lemmas_in_group(self.lemmatize_token(token))
+        # self.parse_lemmas_in_group()
+        self.collection_method.parse_lemmas_in_group(self.lemmatize_token(token))
+
+    def find_collocation(self):
+        return self.collection_method.find()
 
     def lemmatize_token(self, token):
         regex = re.compile('[^a-zA-Z]')
         words = [regex.sub('', x) for x in token.split()]
         return self.lemmatizer.lemmatize(words)
 
-    def parse_lemmas_in_group(self, grp):
-        lemmas = {x[1] for x in grp}
-        for l in lemmas:
-            self.lemma_counter[l] += 1
-            for l2 in lemmas-{l}:
-                self.g_counter[l][l2] += 1
-        self.total_groups += 1
+    # def parse_lemmas_in_group(self, grp):
+    #     lemmas = {x[1] for x in grp}
+    #     for l in lemmas:
+    #         self.lemma_counter[l] += 1
+    #         for l2 in lemmas-{l}:
+    #             self.g_counter[l][l2] += 1
+    #     self.total_groups += 1
 
-    def find_collocation(self):
-        # total_lemmas = sum(self.lemma_counter.values())
-        tsh = 1 / 30000.0
-        lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
-        # for l, l_group in self.g_counter.items():
-        #     if lemmas_freq_in_group[l] < tsh:
-        #         continue
-        #     for paired_l, paried_l_count in l_group.items():
-        #         if lemmas_freq_in_group[paired_l] < tsh:
-        #             continue
-        #         expected = lemmas_freq_in_group[l] * lemmas_freq_in_group[paired_l] * self.total_groups
-        #         if paried_l_count > 100*expected:
-        #             if l[0].isupper() or paired_l[0].isupper():
-        #                 continue
-        #             print (l, paired_l)
-        for l, l_group in self.g_counter.items():
-            for paired_l, paried_l_count in l_group.items():
-                if lemmas_freq_in_group[l] < 0.05 and lemmas_freq_in_group[paired_l] < 0.05:
-                    t= self.analyze_pair(l, paired_l, lemmas_freq_in_group)
-                    if t > 4:
-                        print(l, paired_l, t)
-
-    def analyze_pair(self, l1, l2, lemmas_freq_in_group):
-        p1 = lemmas_freq_in_group[l1]
-        p2 = lemmas_freq_in_group[l2]
-        m = p1*p2
-        x = float(self.g_counter[l1][l2]) / self.total_groups
-        s2 = x * (1-x)
-        t = (x - m) / math.sqrt(s2/self.total_groups)
-        return t
+    # def find_collocation(self):
+    #     # total_lemmas = sum(self.lemma_counter.values())
+    #     tsh = 1 / 30000.0
+    #     lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
+    #     for l, l_group in self.g_counter.items():
+    #         for paired_l, paried_l_count in l_group.items():
+    #             if lemmas_freq_in_group[l] < 0.1 and lemmas_freq_in_group[paired_l] < 0.1:
+    #                 t= self.analyze_pair(l, paired_l, lemmas_freq_in_group)
+    #                 if t > 4:
+    #                     print(l, paired_l, t)
+    #
+    # def analyze_pair(self, l1, l2, lemmas_freq_in_group):
+    #     p1 = lemmas_freq_in_group[l1]
+    #     p2 = lemmas_freq_in_group[l2]
+    #     m = p1*p2
+    #     x = float(self.g_counter[l1][l2]) / self.total_groups
+    #     s2 = x * (1-x)
+    #     t = (x - m) / math.sqrt(s2/self.total_groups)
+    #     return t
 
 
 
@@ -104,7 +133,8 @@ docs = list(reader.docs())
 # reader._fileids = ['cicero__on-behalf-of-aulus-caecina__latin.json']
 sentences = list(reader.sents())
 print (len(sentences))
-cc = CollocationCollector(lemmatizer, tokenizer)
+collection_method = DefaultCollectionMethod()
+cc = CollocationCollector(lemmatizer, tokenizer, collection_method)
 cc.parse(sentences)
 cc.find_collocation()
 # print (cc.g_counter["capio"])
