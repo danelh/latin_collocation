@@ -28,12 +28,12 @@ def parse_sentence(sen, lemmatizer, tokenizer):
         print(res)
 
 class DefaultCollectionMethod():
-    def __init__(self):
+    def __init__(self, t_tsh=4.0, freq_tsh=0.1):
         self.g_counter = defaultdict(lambda: defaultdict(int))
         self.lemma_counter = defaultdict(int)
         self.total_groups = 0
-        self.r_tsh = 4.0
-        self.freq_tsh = 0.1
+        self.t_tsh = t_tsh
+        self.freq_tsh = freq_tsh
 
     def parse_lemmas_in_group(self, grp):
         lemmas = {x[1] for x in grp}
@@ -50,7 +50,7 @@ class DefaultCollectionMethod():
             for paired_l, paried_l_count in l_group.items():
                 if lemmas_freq_in_group[l] < self.freq_tsh and lemmas_freq_in_group[paired_l] < self.freq_tsh:
                     t = self.analyze_pair(l, paired_l, lemmas_freq_in_group)
-                    if t > self.r_tsh:
+                    if t > self.t_tsh:
                         print(l, paired_l, t)
 
     def analyze_pair(self, l1, l2, lemmas_freq_in_group):
@@ -63,9 +63,9 @@ class DefaultCollectionMethod():
         return t
 
 class WordDistanceCollectionMethod():
-    def __init__(self, word_distance):
+    def __init__(self, word_distance, t_tsh=4.0, freq_tsh=0.1):
         self.word_distance = word_distance
-        self.default_collection = DefaultCollectionMethod()
+        self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh)
 
     def parse_lemmas_in_group(self, grp):
         # we want groups of word_distance*2 + 1 .(from each side)
@@ -75,12 +75,14 @@ class WordDistanceCollectionMethod():
         # 1: (0, 1 + wd)
         # n: (max(0, n-wd), min(n+wd, length-1)) [length-1 because this is the last element]
         # note that the slice "included" in both sides
-        lemmas_list = [x[1] for x in grp]
-        for l in lemmas_list:
-            # TODO: get relevnt slice
-            _slice = []
-            # We can use the collector of the defulat method (but it expects tupple)
+        # lemmas_list = [x[1] for x in grp]
+        grp_fixed_list = list(grp)
+        for i, l in enumerate(grp):
+            start = max(0, i-self.word_distance)
+            end = min(len(grp)-1, i + self.word_distance)
+            _slice = grp_fixed_list[start:end+1]
             self.default_collection.parse_lemmas_in_group(_slice)
+
     def find(self):
         return self.default_collection.find()
 
@@ -153,8 +155,14 @@ reader = get_corpus_reader(language='latin', corpus_name='latin_text_perseus')
 docs = list(reader.docs())
 # reader._fileids = ['cicero__on-behalf-of-aulus-caecina__latin.json']
 sentences = list(reader.sents())
+
+# to speedup
+sentences = sentences[::2]
+
 print (len(sentences))
-collection_method = DefaultCollectionMethod()
+# collection_method = DefaultCollectionMethod()
+# collection_method = WordDistanceCollectionMethod(2, t_tsh=3, freq_tsh=0.01)
+collection_method = WordDistanceCollectionMethod(1, t_tsh=2.5, freq_tsh=0.01)
 cc = CollocationCollector(lemmatizer, tokenizer, collection_method)
 cc.parse(sentences)
 cc.find_collocation()
