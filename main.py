@@ -62,6 +62,27 @@ class DefaultCollectionMethod():
         t = (x - m) / math.sqrt(s2 / self.total_groups)
         return t
 
+class WordDistanceCollectionMethod():
+    def __init__(self, word_distance):
+        self.word_distance = word_distance
+        self.default_collection = DefaultCollectionMethod()
+
+    def parse_lemmas_in_group(self, grp):
+        # we want groups of word_distance*2 + 1 .(from each side)
+        # every group only the middle word count (unless in the end or beginning)
+        # for index (lemma) which slice we have to take:
+        # 0: (0, 0 + word_distance)
+        # 1: (0, 1 + wd)
+        # n: (max(0, n-wd), min(n+wd, length-1)) [length-1 because this is the last element]
+        # note that the slice "included" in both sides
+        lemmas_list = [x[1] for x in grp]
+        for l in lemmas_list:
+            # TODO: get relevnt slice
+            _slice = []
+            # We can use the collector of the defulat method (but it expects tupple)
+            self.default_collection.parse_lemmas_in_group(_slice)
+    def find(self):
+        return self.default_collection.find()
 
 class CollocationCollector():
     def __init__(self, lemmatizer, tokenizer, collection_method):
