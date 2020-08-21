@@ -1,3 +1,5 @@
+import json
+
 import math
 from collections import defaultdict
 
@@ -29,8 +31,20 @@ def parse_sentence(sen, lemmatizer, tokenizer):
         res = lemmatizer.lemmatize(tokens)
         print(res)
 
-class DefaultCollectionMethod():
+class AbstractCollectionMethod():
+    def __init__(self):
+        self.pairs = None
+
+    def find(self):
+        self.pairs = self._get_pairs()
+        return self.pairs
+
+    def _get_pairs(self):
+        return {}
+
+class DefaultCollectionMethod(AbstractCollectionMethod):
     def __init__(self, t_tsh=4.0, freq_tsh=0.1):
+        super(AbstractCollectionMethod).__init__()
         self.g_counter = defaultdict(lambda: defaultdict(int))
         self.lemma_counter = defaultdict(int)
         self.total_groups = 0
@@ -45,7 +59,7 @@ class DefaultCollectionMethod():
                 self.g_counter[l][l2] += 1
         self.total_groups += 1
 
-    def find(self):
+    def _get_pairs(self):
 
         pairs = defaultdict(lambda: defaultdict(int))
         lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
@@ -56,7 +70,6 @@ class DefaultCollectionMethod():
                     if t > self.t_tsh:
                         # print(l, paired_l, t)
                         pairs[l][paired_l] = t
-
         return pairs
 
     def analyze_pair(self, l1, l2, lemmas_freq_in_group):
@@ -68,8 +81,9 @@ class DefaultCollectionMethod():
         t = (x - m) / math.sqrt(s2 / self.total_groups)
         return t
 
-class WordDistanceCollectionMethod():
+class WordDistanceCollectionMethod(AbstractCollectionMethod):
     def __init__(self, word_distance, t_tsh=4.0, freq_tsh=0.1):
+        super(AbstractCollectionMethod).__init__()
         self.word_distance = word_distance
         self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh)
 
@@ -89,8 +103,11 @@ class WordDistanceCollectionMethod():
             _slice = grp_fixed_list[start:end+1]
             self.default_collection.parse_lemmas_in_group(_slice)
 
-    def find(self):
+    def _get_pairs(self):
         return self.default_collection.find()
+
+    def get_name(self):
+        return "{}{}".format("w", str(self.word_distance))
 
 class CollocationCollector():
     def __init__(self, lemmatizer, tokenizer, collection_methods):
@@ -153,10 +170,33 @@ class CollocationCollector():
     #     t = (x - m) / math.sqrt(s2/self.total_groups)
     #     return t
 
+def merge_collection_methods_to_dict(cms):
+    res_dict = {}
+    for cm in cms:
+        # convert to new dict (and avoid also defaultdict if it is)
+        res_dict[cm.get_name()] = {k: dict(v) for k, v in cm.pairs.items()}
+
+    return res_dict
+
+def save_collectors(cms):
+    d = merge_collection_methods_to_dict(cms)
+    f = open("collectors.json", "w+")
+    f.write(json.dumps(d))
+    f.close()
+
+
+def load_compact_nouns_json():
+    f = open("collectors.json", "r")
+    x = f.read()
+    f.close()
+    return json.loads(x)
+
 # _import_corpus()
 
 
-
+# x = load_compact_nouns_json()
+# print (x["w1"]["litus"])
+# print (x["w2"]["litus"])
 
 tokenizer = LineTokenizer('latin')
 lemmatizer = BackoffLatinLemmatizer()
@@ -167,13 +207,14 @@ docs = list(reader.docs())
 sentences = list(reader.sents())
 
 # to speedup
-sentences = sentences[::3]
+sentences = sentences[::10]
 
 print (len(sentences))
 # collection_method = DefaultCollectionMethod()
 # collection_method = WordDistanceCollectionMethod(2, t_tsh=3, freq_tsh=0.01)
 cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
 cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
+cms = [cm_1, cm_2]
 cc = CollocationCollector(lemmatizer, None, [cm_1,cm_2])
 cc.parse(sentences)
 x = cc.find_collocation()[0]
@@ -182,5 +223,5 @@ y = cc.find_collocation()[1]
 print (x["litus"])
 print (y["litus"])
 print (y["musca"])
-
+save_collectors(cms)
 # very good examples in "stringo" "lacus" "iaceo corpus" "curnu"
