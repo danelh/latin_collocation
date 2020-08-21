@@ -1,4 +1,5 @@
 import json
+from json import JSONEncoder
 
 import math
 from collections import defaultdict
@@ -178,10 +179,25 @@ def merge_collection_methods_to_dict(cms):
 
     return res_dict
 
+def fix_float_for_json(x):
+
+    def pretty_floats(obj):
+        if isinstance(obj, float):
+            return round(obj, 2)
+        elif isinstance(obj, dict):
+            return dict((k, pretty_floats(v)) for k, v in obj.items())
+        elif isinstance(obj, (list, tuple)):
+            return list(map(pretty_floats, obj))
+        return obj
+
+    return json.dumps(pretty_floats(x))
+
 def save_collectors(cms):
     d = merge_collection_methods_to_dict(cms)
+    json_str = fix_float_for_json(d)
+
     f = open("collectors.json", "w+")
-    f.write(json.dumps(d))
+    f.write(json_str)
     f.close()
 
 
@@ -194,9 +210,11 @@ def load_compact_nouns_json():
 # _import_corpus()
 
 
-# x = load_compact_nouns_json()
-# print (x["w1"]["litus"])
-# print (x["w2"]["litus"])
+x = load_compact_nouns_json()
+print (x["w1"]["litus"])
+print (x["w2"]["litus"])
+y = fix_float_for_json(x)
+# print (y["w1"]["litus"])
 
 tokenizer = LineTokenizer('latin')
 lemmatizer = BackoffLatinLemmatizer()
@@ -225,3 +243,5 @@ print (y["litus"])
 print (y["musca"])
 save_collectors(cms)
 # very good examples in "stringo" "lacus" "iaceo corpus" "curnu"
+
+# TODO: json with 2 numbers after the dot
