@@ -47,13 +47,17 @@ class DefaultCollectionMethod():
 
     def find(self):
 
+        pairs = defaultdict(lambda: defaultdict(int))
         lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
         for l, l_group in self.g_counter.items():
             for paired_l, paried_l_count in l_group.items():
                 if lemmas_freq_in_group[l] < self.freq_tsh and lemmas_freq_in_group[paired_l] < self.freq_tsh:
                     t = self.analyze_pair(l, paired_l, lemmas_freq_in_group)
                     if t > self.t_tsh:
-                        print(l, paired_l, t)
+                        # print(l, paired_l, t)
+                        pairs[l][paired_l] = t
+
+        return pairs
 
     def analyze_pair(self, l1, l2, lemmas_freq_in_group):
         p1 = lemmas_freq_in_group[l1]
@@ -89,10 +93,10 @@ class WordDistanceCollectionMethod():
         return self.default_collection.find()
 
 class CollocationCollector():
-    def __init__(self, lemmatizer, tokenizer, collection_method):
+    def __init__(self, lemmatizer, tokenizer, collection_methods):
         self.lemmatizer = lemmatizer
         self.tokenizer = tokenizer
-        self.collection_method = collection_method
+        self.collection_methods = collection_methods
         # self.g_counter = defaultdict(lambda: defaultdict(int))
         # self.lemma_counter = defaultdict(int)
         # self.total_groups = 0
@@ -110,10 +114,11 @@ class CollocationCollector():
 
     def parse_token(self, token):
         # self.parse_lemmas_in_group()
-        self.collection_method.parse_lemmas_in_group(self.lemmatize_token(token))
+        for collection_method in self.collection_methods:
+            collection_method.parse_lemmas_in_group(self.lemmatize_token(token))
 
     def find_collocation(self):
-        return self.collection_method.find()
+        return [collection_method.find() for collection_method in self.collection_methods]
 
     def lemmatize_token(self, token):
         regex = re.compile('[^a-zA-Z]')
@@ -148,8 +153,10 @@ class CollocationCollector():
     #     t = (x - m) / math.sqrt(s2/self.total_groups)
     #     return t
 
-
 # _import_corpus()
+
+
+
 
 tokenizer = LineTokenizer('latin')
 lemmatizer = BackoffLatinLemmatizer()
@@ -160,17 +167,20 @@ docs = list(reader.docs())
 sentences = list(reader.sents())
 
 # to speedup
-sentences = sentences[::1]
+sentences = sentences[::3]
 
 print (len(sentences))
 # collection_method = DefaultCollectionMethod()
 # collection_method = WordDistanceCollectionMethod(2, t_tsh=3, freq_tsh=0.01)
-collection_method = WordDistanceCollectionMethod(1, t_tsh=2.5, freq_tsh=0.01)
-cc = CollocationCollector(lemmatizer, tokenizer, collection_method)
+cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
+cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
+cc = CollocationCollector(lemmatizer, None, [cm_1,cm_2])
 cc.parse(sentences)
-cc.find_collocation()
+x = cc.find_collocation()[0]
+y = cc.find_collocation()[1]
 # print (cc.g_counter["capio"])
-print ("test")
+print (x["litus"])
+print (y["litus"])
+print (y["musca"])
 
-
-# very good examples in "stringo" "lacus" "iaceo corpus"
+# very good examples in "stringo" "lacus" "iaceo corpus" "curnu"
