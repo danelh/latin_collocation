@@ -51,8 +51,10 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
         self.total_groups = 0
         self.t_tsh = t_tsh
         self.freq_tsh = freq_tsh
+        self.ref = defaultdict(list)
 
     def parse_lemmas_in_group(self, grp):
+        grp_dict = {x[1]: x[0] for x in grp}
         lemmas = {x[1] for x in grp}
         for l in lemmas:
             self.lemma_counter[l] += 1
@@ -192,8 +194,21 @@ def fix_float_for_json(x):
 
     return json.dumps(pretty_floats(x))
 
+def sort_collectors(d, lim=100):
+    for x in d:
+        d[x] = sort_collector(d[x], lim)
+
+    return d
+
+def sort_collector(d, lim=100):
+    for k, dv in d.items():
+        l = [(k,v) for k, v in sorted(dv.items(), key=lambda item: item[1], reverse=True)]
+        d[k] = l[:lim]
+    return d
+
 def save_collectors(cms):
     d = merge_collection_methods_to_dict(cms)
+    d = sort_collectors(d, 100)
     json_str = fix_float_for_json(d)
 
     f = open("collectors.json", "w+")
@@ -215,6 +230,7 @@ print (x["w1"]["litus"])
 print (x["w2"]["litus"])
 y = fix_float_for_json(x)
 # print (y["w1"]["litus"])
+# flatten_collector(x["w4"]["litus"])
 
 tokenizer = LineTokenizer('latin')
 lemmatizer = BackoffLatinLemmatizer()
@@ -232,8 +248,9 @@ print (len(sentences))
 # collection_method = WordDistanceCollectionMethod(2, t_tsh=3, freq_tsh=0.01)
 cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
 cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
-cms = [cm_1, cm_2]
-cc = CollocationCollector(lemmatizer, None, [cm_1,cm_2])
+cm_4 = WordDistanceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
+cms = [cm_1, cm_2, cm_4]
+cc = CollocationCollector(lemmatizer, None, cms)
 cc.parse(sentences)
 x = cc.find_collocation()[0]
 y = cc.find_collocation()[1]
