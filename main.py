@@ -40,7 +40,7 @@ class AbstractCollectionMethod():
     def find(self):
         self.pairs = self._get_pairs()
         # print("Here:{}".format(self.get_name()))
-        # self.ref = self._get_ref()
+        self.ref = self._get_ref()
         # print("Here2:{}".format(self.get_name()))
         return self.pairs
 
@@ -61,7 +61,7 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
         self.total_groups = 0
         self.t_tsh = t_tsh
         self.freq_tsh = freq_tsh
-        self._ref = defaultdict(set)
+        self._ref = defaultdict(lambda: defaultdict(int))
         self.grp_list = []
         self.all_pairs = set()
 
@@ -72,8 +72,9 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
         self.grp_list.append(grp_dict)
 
         lemmas = grp_dict.keys()
-        for l in lemmas:
+        for l,v in grp_dict.items():
             self.lemma_counter[l] += 1
+            self._ref[l][v] += 1
             for l2 in lemmas-{l}:
                 self.g_counter[l][l2] += 1
                 # frozenset to avoid duplicats. in comment (see above why)
@@ -81,13 +82,24 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
         self.total_groups += 1
 
     def _get_ref(self):
-        for pair in self.all_pairs:
-            [l1, l2] = list(pair)
-            for grp in self.grp_list:
-                lemmas_set = set(grp.keys())
-                if pair <= lemmas_set:
-                    self._ref[pair].add(frozenset((grp[l1], grp[l2])))
+
         return self._ref
+
+        # all_head_words = self.g_counter.keys()
+        # for grp in self.grp_list:
+        #     for k, v in grp.items():
+        #         if k in all_head_words:
+        #             self._ref[k][v] += 1
+
+
+        # In comment due to space/time issues
+        # for pair in self.all_pairs:
+        #     [l1, l2] = list(pair)
+        #     for grp in self.grp_list:
+        #         lemmas_set = set(grp.keys())
+        #         if pair <= lemmas_set:
+        #             self._ref[pair].add(frozenset((grp[l1], grp[l2])))
+        # return self._ref
 
     def _get_pairs(self):
 
@@ -238,30 +250,81 @@ def sort_collector(d, lim=100):
         d[k] = l[:lim]
     return d
 
-def save_collectors(cms):
+def arrange_by_lemma(d):
+    all_lemmas = set()
+    new_dict = {}
+
+    for cm, dv in d.items():
+        all_lemmas = all_lemmas.union(set(dv.keys()))
+
+    for l in all_lemmas:
+        new_dict[l] = {}
+        for cm, dv in d.items():
+            d_value_for_l = dv.get(l, {})
+            new_dict[l][cm] = d_value_for_l
+
+    return new_dict
+
+def save_collectors(cms, should_arrange_by_lemma=True):
     d = merge_collection_methods_to_dict(cms)
     d = sort_collectors(d, 100)
+    if should_arrange_by_lemma:
+        d = arrange_by_lemma(d)
     json_str = fix_float_for_json(d)
 
     f = open("collectors.json", "w+")
     f.write(json_str)
     f.close()
 
+    save_ref(cms)
 
-def load_compact_nouns_json():
+def merge_refs(refs):
+    merged = defaultdict(lambda: defaultdict(int))
+    for ref in refs:
+        for k, dv in ref.items():
+            for v, value in dv.items():
+                merged[k][v] += value
+
+    return merged
+
+def calculate_ref(ref):
+    calculated = {}
+    for k, v in ref.items():
+        l = [_k for _k, _v in sorted(v.items(), key=lambda item: item[1], reverse=True)]
+        calculated[k] = l[:2]
+
+    return calculated
+
+def save_ref(cms):
+    merged = merge_refs([x.ref for x in cms])
+    ref = calculate_ref(merged)
+
+    json_str = json.dumps(ref)
+    f = open("ref.json", "w+")
+    f.write(json_str)
+    f.close()
+
+
+def load_collectors_json():
     f = open("collectors.json", "r")
     x = f.read()
     f.close()
     return json.loads(x)
 
+def load_ref_json():
+    f = open("ref.json", "r")
+    x = f.read()
+    f.close()
+    return json.loads(x)
+
+
 # _import_corpus()
 
 
-x = load_compact_nouns_json()
-# print (x["w1"]["litus"])
-# print (x["w2"]["litus"])
-# y = fix_float_for_json(x)
+x = load_collectors_json()
+z = load_ref_json()
 
+print(x["litus"])
 tokenizer = LineTokenizer('latin')
 lemmatizer = BackoffLatinLemmatizer()
 
@@ -280,7 +343,7 @@ cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
 cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 cm_4 = WordDistanceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
 # cms = [cm_1, cm_2, cm_4]
-cms = [cm_2]
+cms = [cm_1, cm_2, cm_4]
 cc = CollocationCollector(lemmatizer, None, cms)
 cc.parse(sentences)
 all_collocations = cc.find_collocation()
