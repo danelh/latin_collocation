@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from cltk.corpus.readers import get_corpus_reader
 from cltk.lemmatize.latin.backoff import BackoffLatinLemmatizer
+from cltk.stem.latin.j_v import JVReplacer
 from cltk.tokenize.line import LineTokenizer
 
 import re
@@ -54,13 +55,14 @@ class AbstractCollectionMethod():
         return "no_name"
 
 class DefaultCollectionMethod(AbstractCollectionMethod):
-    def __init__(self, t_tsh=4.0, freq_tsh=0.1):
+    def __init__(self, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
         super(AbstractCollectionMethod).__init__()
         self.g_counter = defaultdict(lambda: defaultdict(int))
         self.lemma_counter = defaultdict(int)
         self.total_groups = 0
         self.t_tsh = t_tsh
         self.freq_tsh = freq_tsh
+        self.min_occurrences = min_occurrences
         self._ref = defaultdict(lambda: defaultdict(int))
         self.grp_list = []
         self.all_pairs = set()
@@ -105,9 +107,11 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
 
         pairs = defaultdict(lambda: defaultdict(int))
         lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
+        lemmas_occurrences = {l: sum(occ.values()) for l,occ in self._ref.items()}
         for l, l_group in self.g_counter.items():
             for paired_l, paried_l_count in l_group.items():
-                if lemmas_freq_in_group[l] < self.freq_tsh and lemmas_freq_in_group[paired_l] < self.freq_tsh:
+                if (lemmas_freq_in_group[l] < self.freq_tsh and lemmas_freq_in_group[paired_l] < self.freq_tsh) \
+                        and (lemmas_occurrences[l] >= self.min_occurrences and lemmas_occurrences[paired_l] >= self.min_occurrences):
                     t = self.analyze_pair(l, paired_l, lemmas_freq_in_group)
                     if t > self.t_tsh:
                         # print(l, paired_l, t)
@@ -125,10 +129,11 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
         return t
 
 class WordDistanceCollectionMethod(AbstractCollectionMethod):
-    def __init__(self, word_distance, t_tsh=4.0, freq_tsh=0.1):
+    def __init__(self, word_distance, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
         super(AbstractCollectionMethod).__init__()
         self.word_distance = word_distance
-        self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh)
+        self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh,
+                                                          min_occurrences=min_occurrences)
 
     def parse_lemmas_in_group(self, grp):
         # we want groups of word_distance*2 + 1 .(from each side)
@@ -160,6 +165,7 @@ class CollocationCollector():
         self.lemmatizer = lemmatizer
         self.tokenizer = tokenizer
         self.collection_methods = collection_methods
+        self.jv_replacer = JVReplacer()
         # self.g_counter = defaultdict(lambda: defaultdict(int))
         # self.lemma_counter = defaultdict(int)
         # self.total_groups = 0
@@ -185,9 +191,16 @@ class CollocationCollector():
         return [collection_method.find() for collection_method in self.collection_methods]
 
     def lemmatize_token(self, token):
+        # i,j and lower
+        token = token.lower()
+        token = self.jv_replacer.replace(token)
         regex = re.compile('[^a-zA-Z]')
         words = [regex.sub('', x) for x in token.split()]
-        return self.lemmatizer.lemmatize(words)
+        lemmas = self.lemmatizer.lemmatize(words)
+        # BUG: self.lemmatizer.lemmatize(['uultuque'])-> vultue
+        # i.e if ends with "que", it return "v" instead of "u"
+        # so we need to run replace again
+        return [(x[0], self.jv_replacer.replace(x[1])) for x in lemmas]
 
     # def parse_lemmas_in_group(self, grp):
     #     lemmas = {x[1] for x in grp}
@@ -343,7 +356,7 @@ cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
 cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 cm_4 = WordDistanceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
 # cms = [cm_1, cm_2, cm_4]
-cms = [cm_1, cm_2, cm_4]
+cms = [cm_4]
 cc = CollocationCollector(lemmatizer, None, cms)
 cc.parse(sentences)
 all_collocations = cc.find_collocation()
