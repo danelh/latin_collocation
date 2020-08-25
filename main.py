@@ -55,26 +55,27 @@ class AbstractCollectionMethod():
         return "no_name"
 
     @staticmethod
-    def extract_pairs_from_data(pairs_data, lemmas_freq, lemmas_count, min_occurrences):
+    def extract_pairs_from_data(pairs_data, number_of_groups, lemmas_count, min_occurrences,
+                                t_tsh):
+        lemmas_freq = {l: float(lemma_count) / number_of_groups for l, lemma_count in lemmas_count.items()}
         pairs = defaultdict(lambda: defaultdict(int))
         for l, l_group in pairs_data.items():
             for l2, l2_count in l_group.items():
                 if lemmas_count[l] >= min_occurrences and lemmas_count[l2] >= min_occurrences:
-                    t = AbstractCollectionMethod.analyze_pair(l, l2, lemmas_freq)
-                    if t > self.t_tsh:
+                    t = AbstractCollectionMethod.analyze_pair(l, l2, pairs_data, lemmas_freq, number_of_groups)
+                    if t >= t_tsh:
                         # print(l, paired_l, t)
-                        pairs[l][paired_l] = t
-                        self.all_pairs.add(frozenset((l, paired_l)))
+                        pairs[l][l2] = t
         return pairs
 
     @staticmethod
-    def analyze_pair(l1, l2, lemmas_freq_in_group):
+    def analyze_pair(l1, l2, pairs_data, lemmas_freq_in_group, groups_count):
         p1 = lemmas_freq_in_group[l1]
         p2 = lemmas_freq_in_group[l2]
         m = p1 * p2
-        x = float(self.g_counter[l1][l2]) / self.total_groups
+        x = float(pairs_data[l1][l2]) / groups_count
         s2 = x * (1 - x)
-        t = (x - m) / math.sqrt(s2 / self.total_groups)
+        t = (x - m) / math.sqrt(s2 / groups_count)
         return t
 
 
@@ -137,14 +138,14 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
             for paired_l, paried_l_count in l_group.items():
                 if (lemmas_freq_in_group[l] < self.freq_tsh and lemmas_freq_in_group[paired_l] < self.freq_tsh) \
                         and (lemmas_occurrences[l] >= self.min_occurrences and lemmas_occurrences[paired_l] >= self.min_occurrences):
-                    t = self.analyze_pair(l, paired_l, lemmas_freq_in_group)
+                    t = self._analyze_pair(l, paired_l, lemmas_freq_in_group)
                     if t > self.t_tsh:
                         # print(l, paired_l, t)
                         pairs[l][paired_l] = t
                         self.all_pairs.add(frozenset((l, paired_l)))
         return pairs
 
-    def analyze_pair(self, l1, l2, lemmas_freq_in_group):
+    def _analyze_pair(self, l1, l2, lemmas_freq_in_group):
         p1 = lemmas_freq_in_group[l1]
         p2 = lemmas_freq_in_group[l2]
         m = p1 * p2
@@ -191,12 +192,11 @@ class WordDistanceCollectionMethod(AbstractCollectionMethod):
         super(AbstractCollectionMethod).__init__()
         self.word_distance = word_distance
         self.min_occurrences = min_occurrences
+        self.t_tsh = t_tsh
         self.pairs_counter = defaultdict(lambda: defaultdict(int))
         self.lemma_counter = defaultdict(int)
         self.slice_sizes_per_lemma = defaultdict(list)
         self._ref = defaultdict(lambda: defaultdict(int))
-        self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh,
-                                                          min_occurrences=min_occurrences)
 
     def parse_lemmas_in_group(self, grp):
         # we want groups of word_distance*2 + 1 .(from each side)
@@ -243,12 +243,20 @@ class WordDistanceCollectionMethod(AbstractCollectionMethod):
         # slice slice includes our main lemma, hence 1 should be sub
         mean_slice_size -= 1
         total_lemmas = sum(self.lemma_counter.values())
-        lemma_freq = {l: float(lemma_count) * mean_slice_size / total_lemmas for l, lemma_count in self.lemma_counter.items()}
-        save_place
-
+        number_of_groups = float(total_lemmas) / mean_slice_size
+        # lemma_freq = {l: float(lemma_count) * mean_slice_size / total_lemmas for l, lemma_count in self.lemma_counter.items()}
+        # lemma_freq = lemma_count / number_of_groups
+        # lemma_freq = {l: float(lemma_count) / number_of_groups for l, lemma_count in self.lemma_counter.items()}
+        return AbstractCollectionMethod.extract_pairs_from_data(
+            pairs_data=self.pairs_counter,
+            number_of_groups=number_of_groups,
+            lemmas_count=self.lemma_counter,
+            min_occurrences=self.min_occurrences,
+            t_tsh=self.t_tsh
+        )
 
     def _get_ref(self):
-        raise Exception("implement")
+        return self._ref
 
     def get_name(self):
         return "{}{}".format("w", str(self.word_distance))
