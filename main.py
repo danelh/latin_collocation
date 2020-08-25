@@ -297,6 +297,7 @@ class CollocationCollector():
         return [collection_method.find() for collection_method in self.collection_methods]
 
     def lemmatize_token(self, token):
+        bad_lemmas = {"", "p"}
         # i,j and lower
         token = token.lower()
         token = self.jv_replacer.replace(token)
@@ -306,7 +307,27 @@ class CollocationCollector():
         # BUG: self.lemmatizer.lemmatize(['uultuque'])-> vultue
         # i.e if ends with "que", it return "v" instead of "u"
         # so we need to run replace again
-        return [(x[0], self.jv_replacer.replace(x[1])) for x in lemmas]
+        return [(x[0], self.jv_replacer.replace(x[1])) for x in lemmas if x[1] not in bad_lemmas]
+
+    def find_sentences(self, required_lemmas, sentences):
+        for s in sentences:
+            if self.is_sentence_have_all_lemmas(s, required_lemmas):
+                print (s)
+
+    def is_sentence_have_all_lemmas(self, s, required_lemmas):
+        d = self.sentence_to_lemmas_dict(s)
+        for rl, rv in required_lemmas.items():
+            if d[rl] < rv:
+                return False
+        return True
+
+    def sentence_to_lemmas_dict(self, sen):
+        l_t = self.lemmatize_token(sen)
+        res = defaultdict(int)
+        for x in l_t:
+            res[x[1]] += 1
+
+        return res
 
     # def parse_lemmas_in_group(self, grp):
     #     lemmas = {x[1] for x in grp}
@@ -461,9 +482,13 @@ print (len(sentences))
 cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
 cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 cm_4 = WordDistanceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
+cm_8 = WordDistanceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
 # cms = [cm_1, cm_2, cm_4]
-cms = [cm_4]
+cms = [cm_4, cm_8]
 cc = CollocationCollector(lemmatizer, None, cms)
+# sentences = ["se accidisse, ut ex senatus consulto P. Scipio et D. Brutus,"]
+# cc.find_sentences({"p": 2}, sentences)
+print ("start")
 cc.parse(sentences)
 all_collocations = cc.find_collocation()
 x = all_collocations[0]
