@@ -54,6 +54,31 @@ class AbstractCollectionMethod():
     def get_name(self):
         return "no_name"
 
+    @staticmethod
+    def extract_pairs_from_data(pairs_data, lemmas_freq, lemmas_count, min_occurrences):
+        pairs = defaultdict(lambda: defaultdict(int))
+        for l, l_group in pairs_data.items():
+            for l2, l2_count in l_group.items():
+                if lemmas_count[l] >= min_occurrences and lemmas_count[l2] >= min_occurrences:
+                    t = AbstractCollectionMethod.analyze_pair(l, l2, lemmas_freq)
+                    if t > self.t_tsh:
+                        # print(l, paired_l, t)
+                        pairs[l][paired_l] = t
+                        self.all_pairs.add(frozenset((l, paired_l)))
+        return pairs
+
+    @staticmethod
+    def analyze_pair(l1, l2, lemmas_freq_in_group):
+        p1 = lemmas_freq_in_group[l1]
+        p2 = lemmas_freq_in_group[l2]
+        m = p1 * p2
+        x = float(self.g_counter[l1][l2]) / self.total_groups
+        s2 = x * (1 - x)
+        t = (x - m) / math.sqrt(s2 / self.total_groups)
+        return t
+
+
+
 class DefaultCollectionMethod(AbstractCollectionMethod):
     def __init__(self, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
         super(AbstractCollectionMethod).__init__()
@@ -213,7 +238,14 @@ class WordDistanceCollectionMethod(AbstractCollectionMethod):
         # question: should account for the size size that is not always 2*word_distance?
         # but many times much less.
         # it makes no sense to me that the t-value for (x,y) and (y,x) will be different.
-        pass
+        # I think pure random will simply take the mean slice size for all lemmas
+        mean_slice_size = sum([sum(x) for x in self.slice_sizes_per_lemma.values()])
+        # slice slice includes our main lemma, hence 1 should be sub
+        mean_slice_size -= 1
+        total_lemmas = sum(self.lemma_counter.values())
+        lemma_freq = {l: float(lemma_count) * mean_slice_size / total_lemmas for l, lemma_count in self.lemma_counter.items()}
+        save_place
+
 
     def _get_ref(self):
         raise Exception("implement")
