@@ -57,6 +57,7 @@ class AbstractCollectionMethod():
     @staticmethod
     def extract_pairs_from_data(pairs_data, number_of_groups, lemmas_count, min_occurrences,
                                 t_tsh):
+        print (lemmas_count["litus"], number_of_groups)
         lemmas_freq = {l: float(lemma_count) / number_of_groups for l, lemma_count in lemmas_count.items()}
         pairs = defaultdict(lambda: defaultdict(int))
         for l, l_group in pairs_data.items():
@@ -75,6 +76,7 @@ class AbstractCollectionMethod():
         m = p1 * p2
         x = float(pairs_data[l1][l2]) / groups_count
         s2 = x * (1 - x)
+        # print (p1,p2,m,x,s2,groups_count)
         t = (x - m) / math.sqrt(s2 / groups_count)
         return t
 
@@ -239,8 +241,10 @@ class WordDistanceCollectionMethod(AbstractCollectionMethod):
         # but many times much less.
         # it makes no sense to me that the t-value for (x,y) and (y,x) will be different.
         # I think pure random will simply take the mean slice size for all lemmas
-        mean_slice_size = sum([sum(x) for x in self.slice_sizes_per_lemma.values()])
+        number_of_slices = sum([len(x) for x in self.slice_sizes_per_lemma.values()])
+        total_slice_size = sum([sum(x) for x in self.slice_sizes_per_lemma.values()])
         # slice slice includes our main lemma, hence 1 should be sub
+        mean_slice_size = float(total_slice_size) / number_of_slices
         mean_slice_size -= 1
         total_lemmas = sum(self.lemma_counter.values())
         number_of_groups = float(total_lemmas) / mean_slice_size
