@@ -128,10 +128,10 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
         t = (x - m) / math.sqrt(s2 / self.total_groups)
         return t
 
-class WordDistanceCollectionMethod(AbstractCollectionMethod):
-    def __init__(self, word_distance, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
+class RandomSliceCollectionMethod(AbstractCollectionMethod):
+    def __init__(self, slice_size, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
         super(AbstractCollectionMethod).__init__()
-        self.word_distance = word_distance
+        self.word_distance = slice_size
         self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh,
                                                           min_occurrences=min_occurrences)
 
@@ -158,7 +158,69 @@ class WordDistanceCollectionMethod(AbstractCollectionMethod):
         return self.default_collection._get_ref()
 
     def get_name(self):
+        return "{}{}".format("r", str(self.word_distance))
+
+
+class WordDistanceCollectionMethod(AbstractCollectionMethod):
+    def __init__(self, word_distance, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
+        super(AbstractCollectionMethod).__init__()
+        self.word_distance = word_distance
+        self.min_occurrences = min_occurrences
+        self.pairs_counter = defaultdict(lambda: defaultdict(int))
+        self.lemma_counter = defaultdict(int)
+        self.slice_sizes_per_lemma = defaultdict(list)
+        self._ref = defaultdict(lambda: defaultdict(int))
+        self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh,
+                                                          min_occurrences=min_occurrences)
+
+    def parse_lemmas_in_group(self, grp):
+        # we want groups of word_distance*2 + 1 .(from each side)
+        # every group only the middle word count (unless in the end or beginning)
+        # for index (lemma) which slice we have to take:
+        # 0: (0, 0 + word_distance)
+        # 1: (0, 1 + wd)
+        # n: (max(0, n-wd), min(n+wd, length-1)) [length-1 because this is the last element]
+        # note that the slice "included" in both sides
+        # lemmas_list = [x[1] for x in grp]
+        grp_fixed_list = list(grp)
+        for i, l in enumerate(grp):
+            self._ref[l[1]][l[0]] += 1
+            self.lemma_counter[l[1]] += 1
+            start = max(0, i - self.word_distance)
+            end = min(len(grp) - 1, i + self.word_distance)
+            _slice = grp_fixed_list[start:end + 1]
+            self.slice_sizes_per_lemma[l[1]].append(len(_slice))
+            lemma_index_in_slice = i - start
+            self._parse_slice(_slice, lemma_index_in_slice)
+
+    def _parse_slice(self, slice, lemma_index):
+        lemma = slice[lemma_index][1]
+        del slice[lemma_index]
+        # There is a question if we should count a lemma more than once,
+        # if it occurs so : YXY - I think it should be counted indeed
+        # because eventually the computation is the number of co-occurneces
+        # devided by chance it happens statisically.
+        # on the other hand: meaning-base approuch says that a word cannot
+        # be connected twice.
+        # finally I think it should be counted once! since what I'm counting
+        # really is pairs: different pairs. XYX - contains one pair.
+        # hence we are using set
+        lemmas_in_slice = {x[1] for x in slice}
+        for cl in lemmas_in_slice:
+            self.pairs_counter[lemma][cl] += 1
+
+    def _get_pairs(self):
+        # question: should account for the size size that is not always 2*word_distance?
+        # but many times much less.
+        # it makes no sense to me that the t-value for (x,y) and (y,x) will be different.
+        pass
+
+    def _get_ref(self):
+        raise Exception("implement")
+
+    def get_name(self):
         return "{}{}".format("w", str(self.word_distance))
+
 
 class CollocationCollector():
     def __init__(self, lemmatizer, tokenizer, collection_methods):
