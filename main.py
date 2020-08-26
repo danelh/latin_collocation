@@ -93,7 +93,7 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
         self.min_occurrences = min_occurrences
         self._ref = defaultdict(lambda: defaultdict(int))
         self.grp_list = []
-        self.all_pairs = set()
+        # self.all_pairs = set()
 
     def parse_lemmas_in_group(self, grp):
         grp_dict = {x[1]: x[0] for x in grp}
@@ -144,7 +144,7 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
                     if t > self.t_tsh:
                         # print(l, paired_l, t)
                         pairs[l][paired_l] = t
-                        self.all_pairs.add(frozenset((l, paired_l)))
+                        # self.all_pairs.add(frozenset((l, paired_l)))
         return pairs
 
     def _analyze_pair(self, l1, l2, lemmas_freq_in_group):
@@ -159,25 +159,22 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
 class RandomSliceCollectionMethod(AbstractCollectionMethod):
     def __init__(self, slice_size, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
         super(AbstractCollectionMethod).__init__()
-        self.word_distance = slice_size
+        self.slice_size = slice_size
         self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh,
-                                                          min_occurrences=min_occurrences)
+                                                          min_occurrences=min_occurrences * self.slice_size)
 
     def parse_lemmas_in_group(self, grp):
-        # we want groups of word_distance*2 + 1 .(from each side)
-        # every group only the middle word count (unless in the end or beginning)
-        # for index (lemma) which slice we have to take:
-        # 0: (0, 0 + word_distance)
-        # 1: (0, 1 + wd)
-        # n: (max(0, n-wd), min(n+wd, length-1)) [length-1 because this is the last element]
-        # note that the slice "included" in both sides
-        # lemmas_list = [x[1] for x in grp]
+        # We want groups in slices (not included):
+        # (0, slice_size)
+        # (1, slice_size+1)
         grp_fixed_list = list(grp)
         for i, l in enumerate(grp):
-            start = max(0, i-self.word_distance)
-            end = min(len(grp)-1, i + self.word_distance)
-            _slice = grp_fixed_list[start:end+1]
+            start = i
+            end = min(len(grp), i + self.slice_size)
+            _slice = grp_fixed_list[start:end]
             self.default_collection.parse_lemmas_in_group(_slice)
+            if end == len(grp):
+                break
 
     def _get_pairs(self):
         return self.default_collection._get_pairs()
@@ -186,7 +183,7 @@ class RandomSliceCollectionMethod(AbstractCollectionMethod):
         return self.default_collection._get_ref()
 
     def get_name(self):
-        return "{}{}".format("r", str(self.word_distance))
+        return "{}{}".format("r", str(self.slice_size))
 
 
 class WordDistanceCollectionMethod(AbstractCollectionMethod):
@@ -483,11 +480,15 @@ cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
 cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 cm_4 = WordDistanceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
 cm_8 = WordDistanceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
+rw_4 = RandomSliceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
+rw_8 = RandomSliceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
+rw_16 = RandomSliceCollectionMethod(16, t_tsh=2, freq_tsh=0.01)
 # cms = [cm_1, cm_2, cm_4]
-cms = [cm_4, cm_8]
+cms = [rw_16]
 cc = CollocationCollector(lemmatizer, None, cms)
-# sentences = ["se accidisse, ut ex senatus consulto P. Scipio et D. Brutus,"]
-# cc.find_sentences({"p": 2}, sentences)
+# sentences = ["nec pedes nec caput"]
+# cc.find_sentences({"haereo": 1, "lutum": 1}, sentences)
+# raise Exception("Fdfd")
 print ("start")
 cc.parse(sentences)
 all_collocations = cc.find_collocation()
