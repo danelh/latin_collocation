@@ -133,54 +133,74 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
 
     def _get_pairs(self):
 
-        pairs = defaultdict(lambda: defaultdict(int))
-        lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
-        lemmas_occurrences = {l: sum(occ.values()) for l,occ in self._ref.items()}
-        for l, l_group in self.g_counter.items():
-            for paired_l, paried_l_count in l_group.items():
-                if (lemmas_freq_in_group[l] < self.freq_tsh and lemmas_freq_in_group[paired_l] < self.freq_tsh) \
-                        and (lemmas_occurrences[l] >= self.min_occurrences and lemmas_occurrences[paired_l] >= self.min_occurrences):
-                    t = self._analyze_pair(l, paired_l, lemmas_freq_in_group)
-                    if t > self.t_tsh:
-                        # print(l, paired_l, t)
-                        pairs[l][paired_l] = t
-                        # self.all_pairs.add(frozenset((l, paired_l)))
-        return pairs
 
-    def _analyze_pair(self, l1, l2, lemmas_freq_in_group):
-        p1 = lemmas_freq_in_group[l1]
-        p2 = lemmas_freq_in_group[l2]
-        m = p1 * p2
-        x = float(self.g_counter[l1][l2]) / self.total_groups
-        s2 = x * (1 - x)
-        t = (x - m) / math.sqrt(s2 / self.total_groups)
-        return t
+        return AbstractCollectionMethod.extract_pairs_from_data(
+            pairs_data=self.g_counter,
+            number_of_groups=self.total_groups,
+            lemmas_count=self.lemma_counter,
+            min_occurrences=self.min_occurrences,
+            t_tsh=self.t_tsh
+        )
+
+        # pairs = defaultdict(lambda: defaultdict(int))
+        # lemmas_freq_in_group = {l: float(self.lemma_counter[l]) / self.total_groups for l in self.lemma_counter}
+        # lemmas_occurrences = {l: sum(occ.values()) for l,occ in self._ref.items()}
+        # for l, l_group in self.g_counter.items():
+        #     for paired_l, paried_l_count in l_group.items():
+        #         if (lemmas_freq_in_group[l] < self.freq_tsh and lemmas_freq_in_group[paired_l] < self.freq_tsh) \
+        #                 and (lemmas_occurrences[l] >= self.min_occurrences and lemmas_occurrences[paired_l] >= self.min_occurrences):
+        #             t = self._analyze_pair(l, paired_l, lemmas_freq_in_group)
+        #             if t > self.t_tsh:
+        #                 # print(l, paired_l, t)
+        #                 pairs[l][paired_l] = t
+        #                 # self.all_pairs.add(frozenset((l, paired_l)))
+        # return pairs
+
+    # def _analyze_pair(self, l1, l2, lemmas_freq_in_group):
+    #     p1 = lemmas_freq_in_group[l1]
+    #     p2 = lemmas_freq_in_group[l2]
+    #     m = p1 * p2
+    #     x = float(self.g_counter[l1][l2]) / self.total_groups
+    #     s2 = x * (1 - x)
+    #     t = (x - m) / math.sqrt(s2 / self.total_groups)
+    #     return t
 
 class RandomSliceCollectionMethod(AbstractCollectionMethod):
     def __init__(self, slice_size, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
         super(AbstractCollectionMethod).__init__()
         self.slice_size = slice_size
+        self.how_many_slices_was_the_middle_count_in = []
+        self.min_occurrences = min_occurrences
+        self._ref = defaultdict(lambda: defaultdict(int))
         self.default_collection = DefaultCollectionMethod(t_tsh=t_tsh, freq_tsh=freq_tsh,
-                                                          min_occurrences=min_occurrences * self.slice_size)
+                                                          min_occurrences=0)
 
     def parse_lemmas_in_group(self, grp):
         # We want groups in slices (not included):
         # (0, slice_size)
         # (1, slice_size+1)
+        _current_number_of_slices = 0
+        middle_inedx = len(grp) // 2
         grp_fixed_list = list(grp)
         for i, l in enumerate(grp):
+            self._ref[l[1]][l[0]] += 1
             start = i
             end = min(len(grp), i + self.slice_size)
             _slice = grp_fixed_list[start:end]
             self.default_collection.parse_lemmas_in_group(_slice)
+            if middle_inedx >= start and middle_inedx < end:
+                _current_number_of_slices += 1
             if end == len(grp):
                 break
+        self.how_many_slices_was_the_middle_count_in.append(_current_number_of_slices)
 
     def _get_pairs(self):
+        _avg = sum(self.how_many_slices_was_the_middle_count_in) / float(len(self.how_many_slices_was_the_middle_count_in))
+        self.default_collection.min_occurrences = self.min_occurrences * _avg
         return self.default_collection._get_pairs()
 
     def _get_ref(self):
-        return self.default_collection._get_ref()
+        return self._ref
 
     def get_name(self):
         return "{}{}".format("r", str(self.slice_size))
