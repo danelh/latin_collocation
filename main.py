@@ -56,17 +56,16 @@ class AbstractCollectionMethod():
 
     @staticmethod
     def extract_pairs_from_data(pairs_data, number_of_groups, lemmas_count, min_occurrences,
-                                t_tsh):
-        print (lemmas_count["litus"], number_of_groups)
+                                t_tsh, max_freq=7777):
         lemmas_freq = {l: float(lemma_count) / number_of_groups for l, lemma_count in lemmas_count.items()}
         pairs = defaultdict(lambda: defaultdict(int))
         for l, l_group in pairs_data.items():
             for l2, l2_count in l_group.items():
                 if lemmas_count[l] >= min_occurrences and lemmas_count[l2] >= min_occurrences:
-                    t = AbstractCollectionMethod.analyze_pair(l, l2, pairs_data, lemmas_freq, number_of_groups)
-                    if t >= t_tsh:
-                        # print(l, paired_l, t)
-                        pairs[l][l2] = t
+                    if lemmas_freq[l] < max_freq and lemmas_freq[l2] < max_freq:
+                        t = AbstractCollectionMethod.analyze_pair(l, l2, pairs_data, lemmas_freq, number_of_groups)
+                        if t >= t_tsh:
+                            pairs[l][l2] = t
         return pairs
 
     @staticmethod
@@ -139,7 +138,8 @@ class DefaultCollectionMethod(AbstractCollectionMethod):
             number_of_groups=self.total_groups,
             lemmas_count=self.lemma_counter,
             min_occurrences=self.min_occurrences,
-            t_tsh=self.t_tsh
+            t_tsh=self.t_tsh,
+            max_freq=self.freq_tsh
         )
 
         # pairs = defaultdict(lambda: defaultdict(int))
@@ -503,8 +503,9 @@ cm_8 = WordDistanceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
 rw_4 = RandomSliceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
 rw_8 = RandomSliceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
 rw_16 = RandomSliceCollectionMethod(16, t_tsh=2, freq_tsh=0.01)
+rw_2 = RandomSliceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 # cms = [cm_1, cm_2, cm_4]
-cms = [rw_16]
+cms = [rw_2]
 cc = CollocationCollector(lemmatizer, None, cms)
 # sentences = ["nec pedes nec caput"]
 # cc.find_sentences({"haereo": 1, "lutum": 1}, sentences)
