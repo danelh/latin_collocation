@@ -433,7 +433,7 @@ def save_collectors(cms, should_arrange_by_lemma=True):
     f.write(json_str)
     f.close()
 
-    save_ref(cms)
+    save_ref(cms, set(d.keys()))
 
 def merge_refs(refs):
     merged = defaultdict(lambda: defaultdict(int))
@@ -447,14 +447,56 @@ def merge_refs(refs):
 def calculate_ref(ref):
     calculated = {}
     for k, v in ref.items():
-        l = [_k for _k, _v in sorted(v.items(), key=lambda item: item[1], reverse=True)]
-        calculated[k] = l[:2]
+        l = [(_k, _v) for _k, _v in sorted(v.items(), key=lambda item: item[1], reverse=True)]
+        # calculated[k] = l[:2]
+        sugg = []
+        find_greedy_suggestions(l, sugg, required_suggestion_count=2)
+        calculated[k] = sugg
+
+    # for k, v in ref.items():
+    #     find_greedy_suggestions(v)
 
     return calculated
 
-def save_ref(cms):
+def find_greedy_suggestions(l, suggestions, required_suggestion_count=3):
+    sug1 = ""
+    usage_percentage = 1
+    first_word = l[0][0]
+    limit = 0.33
+    while usage_percentage > limit:
+        if len(sug1) == len(first_word):
+            break
+        sug1 = first_word[0: len(sug1) + 1]
+        usage_percentage = get_usage_percentage(sug1, l)
+
+    if (usage_percentage <= limit) and len(sug1) > 1:
+        sug1 = sug1[0:-1]
+    if sug1 not in suggestions:
+        suggestions.append(sug1)
+
+        if len(suggestions) == required_suggestion_count:
+            return
+    else:
+        return
+
+    f_l = [x for x in l if not x[0].startswith(sug1)]
+    if not f_l:
+        return
+    return find_greedy_suggestions(f_l, suggestions)
+
+def get_usage_percentage(start, l):
+    total = sum([_x[1] for _x in l])
+
+    filtered = [_x for _x in l if _x[0].startswith(start)]
+    usage = sum([_x[1] for _x in filtered])
+
+    return float(usage) / total
+
+def save_ref(cms, lemmas):
     merged = merge_refs([x.ref for x in cms])
     ref = calculate_ref(merged)
+
+    ref = {x:v for x,v in ref.items() if x in lemmas}
 
     json_str = json.dumps(ref)
     f = open("ref.json", "w+")
@@ -505,7 +547,7 @@ rw_8 = RandomSliceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
 rw_16 = RandomSliceCollectionMethod(16, t_tsh=2, freq_tsh=0.01)
 rw_2 = RandomSliceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 # cms = [cm_1, cm_2, cm_4]
-cms = [rw_2]
+cms = [rw_16]
 cc = CollocationCollector(lemmatizer, None, cms)
 # sentences = ["nec pedes nec caput"]
 # cc.find_sentences({"haereo": 1, "lutum": 1}, sentences)
