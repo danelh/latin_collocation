@@ -1,4 +1,5 @@
 import json
+import os
 from json import JSONEncoder
 
 import math
@@ -447,9 +448,9 @@ def arrange_by_lemma(d):
 
     return new_dict
 
-def save_collectors(cms, should_arrange_by_lemma=True):
+def save_collectors(cms, limit=100, should_arrange_by_lemma=True):
     d = merge_collection_methods_to_dict(cms)
-    d = sort_collectors(d, 100)
+    d = sort_collectors(d, limit)
     if should_arrange_by_lemma:
         d = arrange_by_lemma(d)
     json_str = fix_float_for_json(d)
@@ -566,6 +567,28 @@ def run_cms_one_by_one(_cms, _lemmatizer):
         cm = None
         gc.collect()
 
+def save_in_path(val, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    f = open(path, "w+")
+    f.write(val)
+    f.close()
+
+
+def get_path_for_lemma(lemma):
+    first = lemma[0]
+    _second = lemma[0]
+    if len(lemma) > 1:
+        _second = lemma[1]
+    second = first+_second
+
+    return "data/{}/{}/{}.json".format(first, second, lemma)
+
+def split_by_word_and_save(data):
+    for lemma, d_l in data.items():
+        path = get_path_for_lemma(lemma)
+        json_string = json.dumps(d_l)
+        save_in_path(json_string, path)
+
 
 # _import_corpus()
 
@@ -614,9 +637,12 @@ print ("start")
 
 # We run one by one due to memory issues
 # run_cms_one_by_one(cms, lemmatizer)
-files = [x.get_name() + ".json" for x in cms]
-cms = load_cms_from_path(files)
-save_collectors(cms)
+# files = [x.get_name() + ".json" for x in cms]
+# cms = load_cms_from_path(files)
+# save_collectors(cms, limit=200)
+
+x = load_collectors_json()
+split_by_word_and_save(x)
+
 # very good examples in "stringo" "lacus" "iaceo corpus" "curnu"
 
-# TODO: json with 2 numbers after the dot
