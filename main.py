@@ -10,6 +10,7 @@ from cltk.stem.latin.j_v import JVReplacer
 from cltk.tokenize.line import LineTokenizer
 
 import re
+import gc
 
 def _import_corpus():
     from cltk.corpus.utils.importer import CorpusImporter
@@ -37,6 +38,7 @@ class AbstractCollectionMethod():
     def __init__(self):
         self.pairs = None
         self.ref = None
+        self.name = "no name"
 
     def find(self):
         self.pairs = self._get_pairs()
@@ -52,11 +54,35 @@ class AbstractCollectionMethod():
         return {}
 
     def get_name(self):
-        return "no_name"
+        return self.name
+
+    def save(self, path=""):
+        d = {'pairs': self.pairs,
+             'ref': self.ref,
+             'name': self.name}
+        json_str = json.dumps(d)
+        path += "{}.json".format(self.name)
+        f = open(path, "w+")
+        f.write(json_str)
+        f.close()
+
+    @staticmethod
+    def load(path):
+        res = AbstractCollectionMethod()
+        f = open(path, "r")
+        x = f.read()
+        f.close()
+
+        d = json.loads(x)
+        res.name = d['name']
+        res.pairs = d['pairs']
+        res.ref = d['ref']
+
+        return res
 
     @staticmethod
     def extract_pairs_from_data(pairs_data, number_of_groups, lemmas_count, min_occurrences,
-                                t_tsh, max_freq=7777):
+                                t_tsh, max_freq=7777.0):
         lemmas_freq = {l: float(lemma_count) / number_of_groups for l, lemma_count in lemmas_count.items()}
         pairs = defaultdict(lambda: defaultdict(int))
         for l, l_group in pairs_data.items():
@@ -169,6 +195,7 @@ class RandomSliceCollectionMethod(AbstractCollectionMethod):
     def __init__(self, slice_size, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
         super(AbstractCollectionMethod).__init__()
         self.slice_size = slice_size
+        self.name = "{}{}".format("r", str(self.slice_size))
         self.how_many_slices_was_the_middle_count_in = []
         self.min_occurrences = min_occurrences
         self._ref = defaultdict(lambda: defaultdict(int))
@@ -202,14 +229,12 @@ class RandomSliceCollectionMethod(AbstractCollectionMethod):
     def _get_ref(self):
         return self._ref
 
-    def get_name(self):
-        return "{}{}".format("r", str(self.slice_size))
-
 
 class WordDistanceCollectionMethod(AbstractCollectionMethod):
     def __init__(self, word_distance, t_tsh=4.0, freq_tsh=0.1, min_occurrences=10):
         super(AbstractCollectionMethod).__init__()
         self.word_distance = word_distance
+        self.name = "{}{}".format("w", str(self.word_distance))
         self.min_occurrences = min_occurrences
         self.t_tsh = t_tsh
         self.pairs_counter = defaultdict(lambda: defaultdict(int))
@@ -279,8 +304,6 @@ class WordDistanceCollectionMethod(AbstractCollectionMethod):
     def _get_ref(self):
         return self._ref
 
-    def get_name(self):
-        return "{}{}".format("w", str(self.word_distance))
 
 
 class CollocationCollector():
@@ -295,7 +318,7 @@ class CollocationCollector():
 
     def parse(self, sentences):
         for i, s in enumerate(sentences):
-            if 0 == (i % 100):
+            if 0 == (i % 10000):
                 print ("sentences: {}".format(i))
             self.parse_sentence(s)
 
@@ -526,16 +549,34 @@ def create_cm_list(wd, rs):
     for w in wd:
         l.append(WordDistanceCollectionMethod(w, t_tsh=1.8))
     for r in rs:
-        l.append(RandomSliceCollectionMethod(8, t_tsh=2, freq_tsh=0.01))
+        l.append(RandomSliceCollectionMethod(r, t_tsh=2, freq_tsh=0.01))
 
     return l
+
+def load_cms_from_path(l):
+    return [AbstractCollectionMethod.load(x) for x in l]
+
+def run_cms_one_by_one(_cms, _lemmatizer):
+    while len(_cms):
+        cm = _cms.pop()
+        _cc = CollocationCollector(_lemmatizer, None, [cm])
+        _cc.parse(sentences)
+        _cc.find_collocation()
+        cm.save()
+        cm = None
+        gc.collect()
+
+
 # _import_corpus()
 
 
 x = load_collectors_json()
 z = load_ref_json()
 
-print(x["litus"])
+try:
+    print(x["litus"])
+except Exception as e:
+    print ("no litus")
 tokenizer = LineTokenizer('latin')
 lemmatizer = BackoffLatinLemmatizer()
 
@@ -550,29 +591,31 @@ sentences = sentences[::1]
 print (len(sentences))
 # collection_method = DefaultCollectionMethod()
 # collection_method = WordDistanceCollectionMethod(2, t_tsh=3, freq_tsh=0.01)
-# cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
-# cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
+cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
+cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 # cm_4 = WordDistanceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
 # cm_8 = WordDistanceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
 # rw_4 = RandomSliceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
 # rw_8 = RandomSliceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
 # rw_16 = RandomSliceCollectionMethod(16, t_tsh=2, freq_tsh=0.01)
 # rw_2 = RandomSliceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
-# cms = [cm_1, cm_2, cm_4]
+# cms = [cm_1, cm_2]
 cms = create_cm_list(wd=[1, 2, 3, 4, 6, 8], rs=[1, 2, 3, 4, 6, 8, 12, 16])
 cc = CollocationCollector(lemmatizer, None, cms)
 # sentences = ["nec pedes nec caput"]
 # cc.find_sentences({"haereo": 1, "lutum": 1}, sentences)
 # raise Exception("Fdfd")
 print ("start")
-cc.parse(sentences)
-all_collocations = cc.find_collocation()
-x = all_collocations[0]
-# y = all_collocations[1]
-# print (cc.g_counter["capio"])
-print (x["litus"])
-# print (y["litus"])
-# print (y["musca"])
+# cc.parse(sentences)
+# all_collocations = cc.find_collocation()
+# x = all_collocations[0]
+# print (x["litus"])
+
+
+# We run one by one due to memory issues
+# run_cms_one_by_one(cms, lemmatizer)
+files = [x.get_name() + ".json" for x in cms]
+cms = load_cms_from_path(files)
 save_collectors(cms)
 # very good examples in "stringo" "lacus" "iaceo corpus" "curnu"
 
