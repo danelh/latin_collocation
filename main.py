@@ -294,7 +294,9 @@ class CollocationCollector():
         # self.total_groups = 0
 
     def parse(self, sentences):
-        for s in sentences:
+        for i, s in enumerate(sentences):
+            if 0 == (i % 100):
+                print ("sentences: {}".format(i))
             self.parse_sentence(s)
 
     def parse_sentence(self, sen):
@@ -462,6 +464,9 @@ def find_greedy_suggestions(l, suggestions, required_suggestion_count=3):
     sug1 = ""
     usage_percentage = 1
     first_word = l[0][0]
+    # Ideally, I would like "limit" to be function of the number of suggestion left.
+    # the higher the number the higher the limit.
+    # but this optimization is on low-priority
     limit = 0.33
     while usage_percentage > limit:
         if len(sug1) == len(first_word):
@@ -516,7 +521,14 @@ def load_ref_json():
     f.close()
     return json.loads(x)
 
+def create_cm_list(wd, rs):
+    l = []
+    for w in wd:
+        l.append(WordDistanceCollectionMethod(w, t_tsh=1.8))
+    for r in rs:
+        l.append(RandomSliceCollectionMethod(8, t_tsh=2, freq_tsh=0.01))
 
+    return l
 # _import_corpus()
 
 
@@ -538,16 +550,16 @@ sentences = sentences[::1]
 print (len(sentences))
 # collection_method = DefaultCollectionMethod()
 # collection_method = WordDistanceCollectionMethod(2, t_tsh=3, freq_tsh=0.01)
-cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
-cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
-cm_4 = WordDistanceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
-cm_8 = WordDistanceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
-rw_4 = RandomSliceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
-rw_8 = RandomSliceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
-rw_16 = RandomSliceCollectionMethod(16, t_tsh=2, freq_tsh=0.01)
-rw_2 = RandomSliceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
+# cm_1 = WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)
+# cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
+# cm_4 = WordDistanceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
+# cm_8 = WordDistanceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
+# rw_4 = RandomSliceCollectionMethod(4, t_tsh=2, freq_tsh=0.01)
+# rw_8 = RandomSliceCollectionMethod(8, t_tsh=2, freq_tsh=0.01)
+# rw_16 = RandomSliceCollectionMethod(16, t_tsh=2, freq_tsh=0.01)
+# rw_2 = RandomSliceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 # cms = [cm_1, cm_2, cm_4]
-cms = [rw_16]
+cms = create_cm_list(wd=[1, 2, 3, 4, 6, 8], rs=[1, 2, 3, 4, 6, 8, 12, 16])
 cc = CollocationCollector(lemmatizer, None, cms)
 # sentences = ["nec pedes nec caput"]
 # cc.find_sentences({"haereo": 1, "lutum": 1}, sentences)
