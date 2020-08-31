@@ -589,13 +589,25 @@ def split_by_word_and_save(data):
         json_string = json.dumps(d_l)
         save_in_path(json_string, path)
 
+def save_docs_list(docs):
+    x = ["{}. ({})".format(x['englishTitle'], x['author']) for x in docs]
+    f = open("docs.txt", "w+")
+    for i, p in enumerate(x):
+        f.writelines(["{}. {}\n".format(i+1, p)])
+    f.close()
 
+def save_all_lemmas_sorted(lemmas):
+    f = open("all_lemmas.txt", "w+")
+    lemmas = sorted(lemmas)
+    str_to_save = ",".join(lemmas)
+    f.write(str_to_save)
+    f.close()
 # _import_corpus()
 
 
 x = load_collectors_json()
 z = load_ref_json()
-
+# save_all_lemmas_sorted(z.keys())
 try:
     print(x["litus"])
 except Exception as e:
@@ -605,8 +617,11 @@ lemmatizer = BackoffLatinLemmatizer()
 
 reader = get_corpus_reader(language='latin', corpus_name='latin_text_perseus')
 docs = list(reader.docs())
+# save_docs_list(docs)
 # reader._fileids = ['cicero__on-behalf-of-aulus-caecina__latin.json']
 sentences = list(reader.sents())
+
+
 
 # to speedup
 sentences = sentences[::1]
