@@ -317,6 +317,30 @@ class CollocationCollector():
         # self.lemma_counter = defaultdict(int)
         # self.total_groups = 0
 
+    def get_sentences_to_pairs(self, distance, sentences):
+        sentences_to_pairs = {}
+        for i, s in enumerate(sentences):
+            if 0 == (i % 10000):
+                print ("sentences: {}".format(i))
+            sentences_to_pairs[i] = self.sentence_to_pairs(s, distance)
+
+        return sentences_to_pairs
+
+    def sentence_to_pairs(self, sen, distance):
+
+        pairs = set()
+
+        # No tokens here. our unit must be sentece
+        lemmetized_sen = self.lemmatize_token(sen)
+
+        for i in range(len(lemmetized_sen)-distance):
+            l1 = lemmetized_sen[i][1]
+            for j in range(distance):
+                l2 = lemmetized_sen[i+1+j][1]
+                pairs.add(frozenset((l1, l2)))
+
+        return pairs
+
     def parse(self, sentences):
         for i, s in enumerate(sentences):
             if 0 == (i % 10000):
@@ -604,8 +628,31 @@ def save_all_lemmas_sorted(lemmas):
     f.close()
 # _import_corpus()
 
+# def get_most_significant_matches(cm):
+#     pairs = cm.pairs
+#     all_pairs_dict = {}
+#     for l1, v in pairs.items():
+#         for l2, val in v.items():
+#             all_pairs_dict[frozenset([l1, l2])] = val
+#
+#     # sort:
+#     sorted_list = [k for k, v in sorted(all_pairs_dict.items(), key=lambda item: item[1], reverse=True)]
+#     print (sorted_list[:10000])
+def all_pairs_print(all_pairs):
+    f = open("mo.txt", "w+")
+
+    for l1, v in all_pairs.items():
+        for (l2, val) in v:
+            f.write("{},{}\n".format(l1,l2))
+
+    f.close()
 
 x = load_collectors_json()
+# all_pairs_print(x["w1"])
+# w1 = load_cms_from_path(["w1.json"])[0]
+# save_collectors([w1], limit=200, should_arrange_by_lemma=False)
+# get_most_significant_matches(my_load)
+
 z = load_ref_json()
 # save_all_lemmas_sorted(z.keys())
 try:
@@ -621,8 +668,11 @@ docs = list(reader.docs())
 # reader._fileids = ['cicero__on-behalf-of-aulus-caecina__latin.json']
 sentences = list(reader.sents())
 
-
-
+cc0 = CollocationCollector(lemmatizer, None, [WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)])
+sentences_to_pairs = cc0.get_sentences_to_pairs(1, sentences)
+#print (xx)
+# TODO:
+all_pairs_print(x["w1"], sentences_to_pairs)
 # to speedup
 sentences = sentences[::1]
 
@@ -638,8 +688,8 @@ cm_2 = WordDistanceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 # rw_16 = RandomSliceCollectionMethod(16, t_tsh=2, freq_tsh=0.01)
 # rw_2 = RandomSliceCollectionMethod(2, t_tsh=2, freq_tsh=0.01)
 # cms = [cm_1, cm_2]
-cms = create_cm_list(wd=[1, 2, 3, 4, 6, 8], rs=[1, 2, 3, 4, 6, 8, 12, 16])
-cc = CollocationCollector(lemmatizer, None, cms)
+# cms = create_cm_list(wd=[1, 2, 3, 4, 6, 8], rs=[1, 2, 3, 4, 6, 8, 12, 16])
+cc = CollocationCollector(lemmatizer, None, [cm_2])
 # sentences = ["nec pedes nec caput"]
 # cc.find_sentences({"haereo": 1, "lutum": 1}, sentences)
 # raise Exception("Fdfd")
@@ -647,7 +697,8 @@ print ("start")
 # cc.parse(sentences)
 # all_collocations = cc.find_collocation()
 # x = all_collocations[0]
-# print (x["litus"])
+# save_collectors([cm_2])
+print (x["litus"])
 
 
 # We run one by one due to memory issues
@@ -656,8 +707,8 @@ print ("start")
 # cms = load_cms_from_path(files)
 # save_collectors(cms, limit=200)
 
-x = load_collectors_json()
-split_by_word_and_save(x)
+# x = load_collectors_json()
+# split_by_word_and_save(x)
 
 # very good examples in "stringo" "lacus" "iaceo corpus" "curnu"
 
