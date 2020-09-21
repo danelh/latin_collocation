@@ -656,7 +656,7 @@ def all_pairs_print(all_pairs, s2p, sentences):
 
     for p, s_l in pairs_to_sentance.items():
             # TODO: undestand why sine mora for example is missing.
-            # TODO: all mora is missing
+            # TODO: all mora is missing. necesse est dissapeared also
         if len(s_l) >= 5:
             # TODO: mark with * l1 and l2 in the sentence.
             # TODO and add ref to the sentences
