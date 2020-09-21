@@ -1,5 +1,6 @@
 import json
 import os
+import random
 from json import JSONEncoder
 
 import math
@@ -638,13 +639,39 @@ def save_all_lemmas_sorted(lemmas):
 #     # sort:
 #     sorted_list = [k for k, v in sorted(all_pairs_dict.items(), key=lambda item: item[1], reverse=True)]
 #     print (sorted_list[:10000])
-def all_pairs_print(all_pairs):
-    f = open("mo.txt", "w+")
+def all_pairs_print(all_pairs, s2p, sentences):
+    f = open("mo.txt", "w+", encoding='utf-8')
+
+    pairs_to_sentance = {}
 
     for l1, v in all_pairs.items():
         for (l2, val) in v:
-            f.write("{},{}\n".format(l1,l2))
+            # f.write("{},{}\n".format(l1,l2))
+            pairs_to_sentance[frozenset((l1,l2))] = []
 
+    for s, p_list in s2p.items():
+        for p in p_list:
+            if p in pairs_to_sentance:
+                pairs_to_sentance[p].append(s)
+
+    for p, s_l in pairs_to_sentance.items():
+            # TODO: undestand why sine mora for example is missing.
+            # TODO: all mora is missing
+        if len(s_l) >= 5:
+            # TODO: mark with * l1 and l2 in the sentence.
+            # TODO and add ref to the sentences
+            # TODO inside sentece replace \n with <br>
+            selected_sentences_indeces = random.sample(s_l, 5)
+            s_to_write = [sentences[x] for x in selected_sentences_indeces]
+            s_to_write = "-" + "\n-".join(s_to_write) + "\n"
+            # s_to_write = s_to_write.encode('utf-8').decode('utf-8')
+            tt = tuple(p)
+            l1 = tt[0]
+            l2 = tt[1]
+            f.write("${} {}$\n~~~~\n".format(l1,l2))
+            f.write(s_to_write)
+
+    # f.write(json.dumps({str(tuple(k)):v for k, v in pairs_to_sentance.items()}))
     f.close()
 
 x = load_collectors_json()
@@ -671,8 +698,8 @@ sentences = list(reader.sents())
 cc0 = CollocationCollector(lemmatizer, None, [WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)])
 sentences_to_pairs = cc0.get_sentences_to_pairs(1, sentences)
 #print (xx)
-# TODO:
-all_pairs_print(x["w1"], sentences_to_pairs)
+
+all_pairs_print(x["w1"], sentences_to_pairs, sentences)
 # to speedup
 sentences = sentences[::1]
 
