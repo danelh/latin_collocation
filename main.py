@@ -668,6 +668,8 @@ def all_pairs_print(all_pairs, s2p, sentences):
             tt = tuple(p)
             l1 = tt[0]
             l2 = tt[1]
+            # TODO: answer to missing, is because file is missig. since crashed in tuple.
+            # probably when the same word twice!
             f.write("${} {}$\n~~~~\n".format(l1,l2))
             f.write(s_to_write)
 
