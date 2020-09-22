@@ -677,7 +677,7 @@ def all_pairs_print(all_pairs, s2p, sentences, cc, sentences_to_doc):
                 for ws, ls in lemmas_in_sen:
                     if (ls in [l1, l2]) and (ws not in already_replaced):
                         current_sen = current_sen.replace(ws, "*{}*".format(ws))
-                        s_to_write[i] = current_sen + "#{}#".format(current_sentence_doc)
+                        s_to_write[i] = current_sen + " #{}#".format(current_sentence_doc)
                         already_replaced.add(ws)
 
             s_to_write = [x.replace("\n", "<br>") for x in s_to_write]
@@ -706,7 +706,7 @@ def sentences_to_ref():
 
     senteces_to_ref = {}
     for k, k_docs in sentences_to_doc.items():
-        senteces_to_ref[k] = ",".join(["{}.{}".format(k_doc['originalTitle'].title(), k_doc['author'].title()) for k_doc in k_docs])
+        senteces_to_ref[k] = ";;;".join(["{}. {}".format(k_doc['originalTitle'].title(), k_doc['author'].title()) for k_doc in k_docs])
     return senteces_to_ref
 
 
@@ -715,6 +715,23 @@ def print_all_sen(sen):
     f.writelines(sen)
     f.close()
 
+def split_mo_file():
+    # chunks of 7
+    f = open("mo.txt", "r", encoding='utf-8')
+    lines = f.readlines()
+    f.close()
+    chunk_size = 6300
+    chunks = [lines[i:i + chunk_size] for i in range(0, len(lines), chunk_size)]
+
+    for i, c in enumerate(chunks):
+        _f = open("mo/mo_{}.txt".format(1+i), "w+", encoding='utf-8')
+        _f.writelines(c)
+        _f.close()
+
+    print(len(lines))
+
+
+# split_mo_file()
 x = load_collectors_json()
 # all_pairs_print(x["w1"])
 # w1 = load_cms_from_path(["w1.json"])[0]
