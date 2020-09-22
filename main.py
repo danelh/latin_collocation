@@ -639,7 +639,7 @@ def save_all_lemmas_sorted(lemmas):
 #     # sort:
 #     sorted_list = [k for k, v in sorted(all_pairs_dict.items(), key=lambda item: item[1], reverse=True)]
 #     print (sorted_list[:10000])
-def all_pairs_print(all_pairs, s2p, sentences, cc):
+def all_pairs_print(all_pairs, s2p, sentences, cc, sentences_to_doc):
     f = open("mo.txt", "w+", encoding='utf-8')
 
     pairs_to_sentance = {}
@@ -654,15 +654,10 @@ def all_pairs_print(all_pairs, s2p, sentences, cc):
             if p in pairs_to_sentance:
                 pairs_to_sentance[p].append(s)
 
-    sen_count = 2
+    sen_count = 5
     for p, s_l in pairs_to_sentance.items():
 
-            # TODO: undestand why sine mora for example is missing.
-            # TODO: all mora is missing. necesse est dissapeared also
         if len(s_l) >= sen_count:
-            # TODO: mark with * l1 and l2 in the sentence.
-            # TODO and add ref to the sentences
-            # TODO inside sentece replace \n with <br>
             tt = tuple(p)
             l1 = tt[0]
             try:
@@ -674,24 +669,46 @@ def all_pairs_print(all_pairs, s2p, sentences, cc):
             s_to_write = [sentences[x] for x in selected_sentences_indeces]
             lemmas = [cc.lemmatize_token(x) for x in s_to_write]
             for i in range(len(s_to_write)):
+                # print (sentences_to_doc[s_to_write[i]])
+                current_sentence_doc = sentences_to_doc[s_to_write[i]]
                 lemmas_in_sen = lemmas[i]
                 current_sen = s_to_write[i]
                 already_replaced = set()
                 for ws, ls in lemmas_in_sen:
                     if (ls in [l1, l2]) and (ws not in already_replaced):
                         current_sen = current_sen.replace(ws, "*{}*".format(ws))
-                        s_to_write[i] = current_sen
+                        s_to_write[i] = current_sen + "#{}#".format(current_sentence_doc)
                         already_replaced.add(ws)
 
             s_to_write = [x.replace("\n", "<br>") for x in s_to_write]
             s_to_write = [x for x in s_to_write]
             s_to_write = "-" + "\n-".join(s_to_write) + "\n"
             # s_to_write = s_to_write.encode('utf-8').decode('utf-8')
-            f.write("${} {}$\n~~~~\n".format(l1,l2))
+            f.write("\n${} {}$\n".format(l1,l2))
             f.write(s_to_write)
 
     # f.write(json.dumps({str(tuple(k)):v for k, v in pairs_to_sentance.items()}))
     f.close()
+
+def sentences_to_ref():
+    sentences_to_doc = defaultdict(list) # in case same sentece more than one doc
+    reader = get_corpus_reader(language='latin', corpus_name='latin_text_perseus')
+    docs = list(reader.docs())
+    # Test that we have identical lists:
+    #set([x['filename'].split("\\")[-1] for x in docs]) == set(reader._fileids)
+    # reader._fileids = ['cicero__on-behalf-of-aulus-caecina__latin.json']
+    for d in docs:
+        path = d['filename'].split("\\")[-1]
+        reader._fileids = [path]
+        sentences = list(reader.sents())
+        for s in sentences:
+            sentences_to_doc[s].append(d)
+
+    senteces_to_ref = {}
+    for k, k_docs in sentences_to_doc.items():
+        senteces_to_ref[k] = ",".join(["{}.{}".format(k_doc['originalTitle'].title(), k_doc['author'].title()) for k_doc in k_docs])
+    return senteces_to_ref
+
 
 def print_all_sen(sen):
     f = open("sen.txt", "w+", encoding='utf-8')
@@ -719,12 +736,13 @@ docs = list(reader.docs())
 # reader._fileids = ['cicero__on-behalf-of-aulus-caecina__latin.json']
 sentences = list(reader.sents())
 
+sentences_to_ref()
 
 cc0 = CollocationCollector(lemmatizer, None, [WordDistanceCollectionMethod(1, t_tsh=2, freq_tsh=0.01)])
 sentences_to_pairs = cc0.get_sentences_to_pairs(1, sentences)
 #print (xx)
 
-all_pairs_print(x["w1"], sentences_to_pairs, sentences, cc0)
+all_pairs_print(x["w1"], sentences_to_pairs, sentences, cc0, sentences_to_ref())
 # to speedup
 sentences = sentences[::1]
 
